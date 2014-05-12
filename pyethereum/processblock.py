@@ -7,7 +7,7 @@ import blocks
 import transactions
 
 
-debug = 1
+debug = 0
 
 # params
 
@@ -341,24 +341,20 @@ def apply_op(block, tx, msg, code, compustate):
         # parameters: msg_hash (32), v (32), r (32), s (32), pubX (32), pubY (32)
         # stack should have location of msg_hash
         ind = stackargs[0]
-        print mem
-        print mem[ind]
-        print mem[ind:ind+32]
         msg_hash = ''.join(map(chr, mem[ind:ind+32]))
         v = int(''.join(map(chr, mem[ind+32:ind+64])).encode('hex'), 16)
         r = int(''.join(map(chr, mem[ind+64:ind+96])).encode('hex'), 16)
         s = int(''.join(map(chr, mem[ind+96:ind+128])).encode('hex'), 16)
         pubX = ''.join(map(chr, mem[ind+128:ind+160])).encode('hex')
         pubY = ''.join(map(chr, mem[ind+160:ind+192])).encode('hex')
-        print 'pubX and Y!!!'
         pub = '04' + pubX + pubY
         pub = pub.decode('hex')
 
-        print 'msghash', msg_hash
-        print 'vrs', v, r, s
-        print 'pub', pub.encode('hex')
+        #print 'msghash', msg_hash
+        #print 'vrs', v, r, s
+        #print 'pub', pub.encode('hex')
         verified = ecdsa_raw_verify(msg_hash, (v, r, s), pub)
-        print 'verified: ', verified
+        #print 'verified: ', verified
         stk.append(verified)
 
     elif op == 'ADDRESS':
