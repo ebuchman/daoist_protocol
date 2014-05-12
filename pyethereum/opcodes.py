@@ -21,6 +21,7 @@ opcodes = {
     0x13: ['BYTE', 2, 1],
     0x20: ['SHA3', 2, 1],
     0x21: ['ECVERIFY', 1, 1],
+    0x22: ['ECVERIFY_RECOVER', 1, 1],
     0x30: ['ADDRESS', 0, 1],
     0x31: ['BALANCE', 0, 1],
     0x32: ['ORIGIN', 0, 1],
