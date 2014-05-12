@@ -7,13 +7,14 @@ import blocks
 import transactions
 
 
-debug = 0
+debug = 1
 
 # params
 
 GSTEP = 1
 GSTOP = 0
 GSHA3 = 20
+GECVERIFY = 50
 GSLOAD = 20
 GSSTORE = 100
 GBALANCE = 20
@@ -194,6 +195,10 @@ def calcfee(block, tx, msg, compustate, op):
     if op == 'SHA3':
         m_extend = max(0, ceil32(stk[-1] + stk[-2]) - len(mem))
         return GSHA3 + m_extend / 32 * GMEMORY
+    elif op == 'ECVERIFY':
+        return 100 # ...
+        m_extend = max(0, ceil32(stk[-1] + stk[-2]) - len(mem))
+        return GECVERIFY + m_extend / 32 * GMEMORY
     elif op == 'SLOAD':
         return GSLOAD
     elif op == 'SSTORE':
@@ -331,6 +336,31 @@ def apply_op(block, tx, msg, code, compustate):
             mem.extend([0] * (ceil32(stackargs[0] + stackargs[1]) - len(mem)))
         data = ''.join(map(chr, mem[stackargs[0]:stackargs[0] + stackargs[1]]))
         stk.append(utils.sha3(data))
+    elif op == 'ECVERIFY':
+        from bitcoin import ecdsa_raw_verify
+        # parameters: msg_hash (32), v (32), r (32), s (32), pubX (32), pubY (32)
+        # stack should have location of msg_hash
+        ind = stackargs[0]
+        print mem
+        print mem[ind]
+        print mem[ind:ind+32]
+        msg_hash = ''.join(map(chr, mem[ind:ind+32]))
+        v = int(''.join(map(chr, mem[ind+32:ind+64])).encode('hex'), 16)
+        r = int(''.join(map(chr, mem[ind+64:ind+96])).encode('hex'), 16)
+        s = int(''.join(map(chr, mem[ind+96:ind+128])).encode('hex'), 16)
+        pubX = ''.join(map(chr, mem[ind+128:ind+160])).encode('hex')
+        pubY = ''.join(map(chr, mem[ind+160:ind+192])).encode('hex')
+        print 'pubX and Y!!!'
+        pub = '04' + pubX + pubY
+        pub = pub.decode('hex')
+
+        print 'msghash', msg_hash
+        print 'vrs', v, r, s
+        print 'pub', pub.encode('hex')
+        verified = ecdsa_raw_verify(msg_hash, (v, r, s), pub)
+        print 'verified: ', verified
+        stk.append(verified)
+
     elif op == 'ADDRESS':
         stk.append(msg.to)
     elif op == 'BALANCE':
