@@ -1,0 +1,70 @@
+initgas = tx.gas
+numDCs = msg.data[0]
+DCindex = 0
+index = 2
+if msg.data[1] == 1:
+    while(DCindex < numDCs):
+        //load data
+        v = msg.data[index]
+        r = msg.data[index + 1]
+        s = msg.data[index + 2]
+        numargs = msg.data[index + 3]
+        args = array(numargs + 1)
+        args[0] = numargs
+        i = 0
+        while(i < numargs):
+            args[i + 1] = msg.data[index + 4 + i]
+            i = i + 1
+
+        //verify signature
+        msghash = sha3(args, numargs)
+        pubkey = array(2)
+        ecrecover(msghash, v, r, s, pubkey)
+        verify = ecverify(msghash, v, r, s, pubkey)
+        if !verify:
+            stop
+       
+        //get address
+        sender = pub2addr(pubkey)
+ 
+        //increment indeces
+        index = index + 4 + numargs
+        DCindex = DCindex + 1
+
+        //-------------------------------------//
+        //                                     //
+        //             DC HANDLER              //
+        //                                     //
+        //-------------------------------------//
+
+
+else:
+    sender = msg.sender
+    while(DCindex < numDCs):
+        numargs = msg.data[index]
+        i = 0
+        args = array(numargs + 1)
+        args[0] = numargs
+        while(i < numargs):
+            args[i + 1] = msg.data[index + i + 1]
+            i = i + 1
+
+        index = index + 1 + numargs
+        DCindex = DCindex + 1
+
+        //-------------------------------------//
+        //                                     //
+        //             DC HANDLER              //
+        //                                     //
+        //-------------------------------------//
+
+
+//-------------------------------------//
+//                                     //
+//   REGULARLY SCHEDULED OPERATIONS    //
+//                                     //
+//-------------------------------------//
+
+
+send(msg.sender, (initgas - tx.gas)*tx.gasprice)
+stop

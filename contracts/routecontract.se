@@ -1,0 +1,4 @@
+if msg.value > 0:
+    contract.storage[msg.sender] = contract.storage[msg.sender] + msg.value
+else:
+    send(msg.sender, contract.storage[msg.sender])
