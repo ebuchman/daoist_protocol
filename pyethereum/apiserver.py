@@ -147,3 +147,17 @@ def connected_peers():
 @app.get(base_url + '/peers/known')
 def known_peers():
     return make_peers_response(peer_manager.get_known_peer_addresses())
+
+
+# ######## DC msg ############
+@app.post(base_url + '/dc/')
+def dc():
+    # request.json FIXME / post json encoded data? i.e. the representation of
+    # a tx
+    indata = bottle.request.body.read()
+    print indata
+    data = json.loads(indata)
+    print data
+    logger.debug('PUT dc/ %s', data)
+    return data # TODO do sumthin
+    # return bottle.redirect(base_url + '/dc/') # TODO + dc.hex_hash())
