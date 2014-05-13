@@ -27,3 +27,5 @@ send_local_blocks = Signal(providing_args=["blocks"])
 local_transaction_received = Signal(providing_args=["transaction"])
 remote_transactions_received = Signal(providing_args=["transactions"])
 send_local_transactions = Signal(providing_args=["transaction"])
+
+dao_command_received = Signal(providing_args=["dao_command"])

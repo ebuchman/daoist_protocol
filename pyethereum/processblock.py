@@ -1,5 +1,6 @@
 import rlp
 from opcodes import opcodes
+from bitcoin import ecdsa_raw_verify, ecdsa_raw_recover
 
 import utils
 import time
@@ -15,7 +16,7 @@ GSTOP = 0
 GSHA3 = 20
 GECVERIFY = 50
 GECRECOVER = 50
-GPUB2ADDR = 50
+GPUB2ADDR = 20
 GSLOAD = 20
 GSSTORE = 100
 GBALANCE = 20
@@ -202,18 +203,13 @@ def calcfee(block, tx, msg, compustate, op):
     if op == 'SHA3':
         m_extend = max(0, ceil32(stk[-1] + stk[-2]) - len(mem))
         return GSHA3 + m_extend / 32 * GMEMORY
+    # EC ops do not extend memory (inputs are fixed size, on the stack)
     elif op == 'ECVERIFY':
-        return 100 # ...
-        m_extend = max(0, ceil32(stk[-1] + stk[-2]) - len(mem))
-        return GECVERIFY + m_extend / 32 * GMEMORY
+        return GECVERIFY
     elif op == 'ECRECOVER':
-        return 100 # ...
-        m_extend = max(0, ceil32(stk[-1] + stk[-2]) - len(mem))
-        return GECVERIFY + m_extend / 32 * GMEMORY
+        return GECRECOVERY
     elif op == 'PUB2ADDR':
-        return 100 # ...
-        m_extend = max(0, ceil32(stk[-1] + stk[-2]) - len(mem))
-        return GECVERIFY + m_extend / 32 * GMEMORY
+        return GPUB2ADDR
     elif op == 'SLOAD':
         return GSLOAD
     elif op == 'SSTORE':
@@ -350,12 +346,8 @@ def apply_op(block, tx, msg, code, compustate):
         if len(mem) < ceil32(stackargs[0] + stackargs[1]):
             mem.extend([0] * (ceil32(stackargs[0] + stackargs[1]) - len(mem)))
         data = ''.join(map(chr, mem[stackargs[0]:stackargs[0] + stackargs[1]]))
-        print 'data to be hashed'
-        print data
-        print data.encode('hex')
         stk.append(utils.sha3(data))
     elif op == 'ECVERIFY':
-        from bitcoin import ecdsa_raw_verify
         # parameters: msg_hash (32), v (32), r (32), s (32), pubX (32), pubY (32)
         # stack should have all args
         msg_hash, v, r, s, pubX, pubY = stackargs
@@ -367,7 +359,6 @@ def apply_op(block, tx, msg, code, compustate):
         print 'verified: ', verified
         stk.append(verified)
     elif op == 'ECRECOVER':
-        from bitcoin import ecdsa_raw_verify, ecdsa_raw_recover
         # parameters: msg_hash (32), v (32), r (32), s (32), p (64 - empty array to hold pubkey)
         # stack should have all args
         msg_hash, v, r, s = stackargs
@@ -375,7 +366,6 @@ def apply_op(block, tx, msg, code, compustate):
         pubX, pubY = ecdsa_raw_recover(msg_hash, (v, r, s))
         stk.append(pubX)
         stk.append(pubY)
-
     elif op == 'PUB2ADDR':
         pubX, pubY = stackargs
         pubXhex = "%02x"%pubX
@@ -386,7 +376,6 @@ def apply_op(block, tx, msg, code, compustate):
         pub = pub.decode('hex')
         addr = utils.sha3(pub)[12:]
         stk.append(addr)
-
     elif op == 'ADDRESS':
         stk.append(msg.to)
     elif op == 'BALANCE':

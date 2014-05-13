@@ -107,6 +107,7 @@ class ChainManager(StoppableLoopThread):
         # initialized after configure
         self.miner = None
         self.blockchain = None
+        self.dcp_list = []
 
     def configure(self, config):
         self.config = config
@@ -231,6 +232,9 @@ class ChainManager(StoppableLoopThread):
             logger.debug('New Head %r', block)
             self._update_head(block)
         return True
+
+    def add_dc_to_dcp(self, dc):
+        pass
 
     def add_transaction(self, transaction):
         logger.debug("add transaction %r" % transaction)
@@ -384,6 +388,9 @@ def gettransactions_received_handler(sender, peer, **kwargs):
     transactions = [rlp.decode(x.serialize()) for x in transactions]
     peer.send_Transactions(transactions)
 
+@receiver(signals.dao_command_received)
+def dao_command_received_handler(sender, dao_command, **kwargs):
+    chain_manager.add_dc_to_dcp(dao_command)
 
 @receiver(signals.remote_blocks_received)
 def remote_blocks_received_handler(sender, block_lst, peer, **kwargs):
