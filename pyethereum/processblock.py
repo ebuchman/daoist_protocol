@@ -14,7 +14,8 @@ GSTEP = 1
 GSTOP = 0
 GSHA3 = 20
 GECVERIFY = 50
-GECVERIFYRECOVER = 100
+GECRECOVER = 50
+GPUB2ADDR = 50
 GSLOAD = 20
 GSSTORE = 100
 GBALANCE = 20
@@ -205,8 +206,12 @@ def calcfee(block, tx, msg, compustate, op):
         return 100 # ...
         m_extend = max(0, ceil32(stk[-1] + stk[-2]) - len(mem))
         return GECVERIFY + m_extend / 32 * GMEMORY
-    elif op == 'ECVERIFY_RECOVER':
-        return 200 # ...
+    elif op == 'ECRECOVER':
+        return 100 # ...
+        m_extend = max(0, ceil32(stk[-1] + stk[-2]) - len(mem))
+        return GECVERIFY + m_extend / 32 * GMEMORY
+    elif op == 'PUB2ADDR':
+        return 100 # ...
         m_extend = max(0, ceil32(stk[-1] + stk[-2]) - len(mem))
         return GECVERIFY + m_extend / 32 * GMEMORY
     elif op == 'SLOAD':
@@ -352,7 +357,7 @@ def apply_op(block, tx, msg, code, compustate):
     elif op == 'ECVERIFY':
         from bitcoin import ecdsa_raw_verify
         # parameters: msg_hash (32), v (32), r (32), s (32), pubX (32), pubY (32)
-        # stack should have location of msg_hash
+        # stack should have all args
         msg_hash, v, r, s, pubX, pubY = stackargs
         pubX, pubY = map(int_to_BE, [pubX, pubY])
         msg_hash = int_to_BE(msg_hash).decode('hex')
@@ -361,22 +366,26 @@ def apply_op(block, tx, msg, code, compustate):
         verified = ecdsa_raw_verify(msg_hash, (v, r, s), pub)
         print 'verified: ', verified
         stk.append(verified)
-    elif op == 'ECVERIFY_RECOVER':
+    elif op == 'ECRECOVER':
         from bitcoin import ecdsa_raw_verify, ecdsa_raw_recover
-        # parameters: msg_hash (32), v (32), r (32), s (32)
-        # stack should have location of msg_hash
+        # parameters: msg_hash (32), v (32), r (32), s (32), p (64 - empty array to hold pubkey)
+        # stack should have all args
         msg_hash, v, r, s = stackargs
         msg_hash = int_to_BE(msg_hash).decode('hex')
         pubX, pubY = ecdsa_raw_recover(msg_hash, (v, r, s))
+        stk.append(pubX)
+        stk.append(pubY)
+
+    elif op == 'PUB2ADDR':
+        pubX, pubY = stackargs
         pubXhex = "%02x"%pubX
         if len(pubXhex) % 2 != 0: pubXhex = "0" + pubXhex
         pubYhex = "%02x"%pubY
         if len(pubYhex)% 2 != 0: pubYhex = "0" + pubYhex
-        pub = '04' + pubXhex + pubYhex
+        pub = pubXhex + pubYhex
         pub = pub.decode('hex')
-        verified = ecdsa_raw_verify(msg_hash, (v, r, s), pub)
-        print 'verified:', verified
-        stk.append(verified)
+        addr = utils.sha3(pub)[12:]
+        stk.append(addr)
 
     elif op == 'ADDRESS':
         stk.append(msg.to)
