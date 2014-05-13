@@ -23,8 +23,8 @@ verified = bitcoin.ecdsa_raw_verify(msg_hash, (v,r,s), pubkey)
 
 gen = blocks.genesis({addr: 10**18})
 
-print serpent.compile_to_assembly(open("DAOist.se").read())
-DAOcode = serpent.compile(open("DAOist.se").read())
+print serpent.compile_to_assembly(open("DAOist frame.se").read())
+DAOcode = serpent.compile(open("DAOist frame.se").read())
 
 DAOcontract = transactions.contract(0, 1, 10**12, 100, DAOcode)
 
