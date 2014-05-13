@@ -6,8 +6,7 @@ import time
 import blocks
 import transactions
 
-
-debug = 0
+debug = 1
 
 # params
 
@@ -190,6 +189,12 @@ def get_op_data(code, index):
 def ceil32(x):
     return x if x % 32 == 0 else x + 32 - (x % 32)
 
+# a silly hack
+def int_to_BE(n):
+    h = "%02x"%n
+    if len(h)%2 != 0:
+        h = "0"+h
+    return h
 
 def calcfee(block, tx, msg, compustate, op):
     stk, mem = compustate.stack, compustate.memory
@@ -340,39 +345,29 @@ def apply_op(block, tx, msg, code, compustate):
         if len(mem) < ceil32(stackargs[0] + stackargs[1]):
             mem.extend([0] * (ceil32(stackargs[0] + stackargs[1]) - len(mem)))
         data = ''.join(map(chr, mem[stackargs[0]:stackargs[0] + stackargs[1]]))
+        print 'data to be hashed'
+        print data
+        print data.encode('hex')
         stk.append(utils.sha3(data))
     elif op == 'ECVERIFY':
         from bitcoin import ecdsa_raw_verify
         # parameters: msg_hash (32), v (32), r (32), s (32), pubX (32), pubY (32)
         # stack should have location of msg_hash
-        ind = stackargs[0]
-        msg_hash = ''.join(map(chr, mem[ind:ind+32]))
-        v = int(''.join(map(chr, mem[ind+32:ind+64])).encode('hex'), 16)
-        r = int(''.join(map(chr, mem[ind+64:ind+96])).encode('hex'), 16)
-        s = int(''.join(map(chr, mem[ind+96:ind+128])).encode('hex'), 16)
-        pubX = ''.join(map(chr, mem[ind+128:ind+160])).encode('hex')
-        pubY = ''.join(map(chr, mem[ind+160:ind+192])).encode('hex')
+        msg_hash, v, r, s, pubX, pubY = stackargs
+        pubX, pubY = map(int_to_BE, [pubX, pubY])
+        msg_hash = int_to_BE(msg_hash).decode('hex')
         pub = '04' + pubX + pubY
         pub = pub.decode('hex')
-
-        #print 'msghash', msg_hash
-        #print 'vrs', v, r, s
-        #print 'pub', pub.encode('hex')
         verified = ecdsa_raw_verify(msg_hash, (v, r, s), pub)
-        #print 'verified: ', verified
+        print 'verified: ', verified
         stk.append(verified)
-
     elif op == 'ECVERIFY_RECOVER':
         from bitcoin import ecdsa_raw_verify, ecdsa_raw_recover
         # parameters: msg_hash (32), v (32), r (32), s (32)
         # stack should have location of msg_hash
-        ind = stackargs[0]
-        msg_hash = ''.join(map(chr, mem[ind:ind+32]))
-        v = int(''.join(map(chr, mem[ind+32:ind+64])).encode('hex'), 16)
-        r = int(''.join(map(chr, mem[ind+64:ind+96])).encode('hex'), 16)
-        s = int(''.join(map(chr, mem[ind+96:ind+128])).encode('hex'), 16)
+        msg_hash, v, r, s = stackargs
+        msg_hash = int_to_BE(msg_hash).decode('hex')
         pubX, pubY = ecdsa_raw_recover(msg_hash, (v, r, s))
-        print pubX, pubY
         pubXhex = "%02x"%pubX
         if len(pubXhex) % 2 != 0: pubXhex = "0" + pubXhex
         pubYhex = "%02x"%pubY
@@ -382,6 +377,7 @@ def apply_op(block, tx, msg, code, compustate):
         verified = ecdsa_raw_verify(msg_hash, (v, r, s), pub)
         print 'verified:', verified
         stk.append(verified)
+
     elif op == 'ADDRESS':
         stk.append(msg.to)
     elif op == 'BALANCE':
