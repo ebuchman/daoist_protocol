@@ -200,7 +200,7 @@ def calcfee(block, tx, msg, compustate, op):
     elif op == 'ECVERIFY':
         return GECVERIFY
     elif op == 'ECRECOVER':
-        return GECRECOVERY
+        return GECRECOVER
     elif op == 'PUB2ADDR':
         return GPUB2ADDR
     elif op == 'SLOAD':

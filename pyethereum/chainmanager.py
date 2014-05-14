@@ -308,7 +308,7 @@ class ChainManager(StoppableLoopThread):
         logger.debug("get_transactions called")
         return self.miner.get_transactions()
 
-    def get_chain(self, start='', count=100):
+    def get_chain(self, start='', count=256):
         "return 'count' blocks starting from head or start"
         logger.debug("get_chain: start:%s count%d", start.encode('hex'), count)
         blocks = []
@@ -421,7 +421,7 @@ def new_peer_connected(sender, peer, **kwargs):
     # request chain
     blocks = [b.hash for b in chain_manager.get_chain(count=256)]
     with peer.lock:
-        peer.send_GetChain(blocks, count=30)
+        peer.send_GetChain(blocks, count=256)
         logger.debug("send get chain %r", [b.encode('hex') for b in blocks])
 
 
@@ -465,9 +465,13 @@ def remote_blocks_received_handler(sender, block_lst, peer, **kwargs):
             bhash = utils.sha3(rlp.encode(block_data)).encode('hex')[:4]
             phash = block_data[0][0].encode('hex')[:4]
             number = utils.decode_int(block_data[0][6])
-            logger.debug('Block(#%d %s %s) with unknown parent, requesting ...',
+            if phash == blocks.GENESIS_PREVHASH:
+                logger.debug('Incompatible Genesis %r', block)
+                peer.send_Disconnect(reason='Wrong genesis block')
+            else:
+                logger.debug('Block(#%d %s %s) with unknown parent, requesting ...',
                          number, bhash, phash.encode('hex')[:4])
-            chain_manager.synchronize_blockchain()
+                chain_manager.synchronize_blockchain()
             break
         if block.hash in chain_manager:
             logger.debug('Known %r', block)
@@ -477,9 +481,6 @@ def remote_blocks_received_handler(sender, block_lst, peer, **kwargs):
                 success = chain_manager.add_block(block)
                 if success:
                     logger.debug('Added %r', block)
-            elif block.prevhash == blocks.GENESIS_PREVHASH:
-                logger.debug('Incompatible Genesis %r', block)
-                peer.send_Disconnect(reason='Wrong genesis block')
             else:
                 logger.debug('Orphant %r', block)
     if chain_manager.head != old_head:
