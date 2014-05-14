@@ -191,13 +191,6 @@ def get_op_data(code, index):
 def ceil32(x):
     return x if x % 32 == 0 else x + 32 - (x % 32)
 
-# a silly hack
-def int_to_BE(n):
-    h = "%02x"%n
-    if len(h)%2 != 0:
-        h = "0"+h
-    return h
-
 def calcfee(block, tx, msg, compustate, op):
     stk, mem = compustate.stack, compustate.memory
     if op == 'SHA3':
@@ -351,10 +344,10 @@ def apply_op(block, tx, msg, code, compustate):
         # parameters: msg_hash (32), v (32), r (32), s (32), pubX (32), pubY (32)
         # stack should have all args
         msg_hash, v, r, s, pubX, pubY = stackargs
-        pubX, pubY = map(int_to_BE, [pubX, pubY])
-        msg_hash = int_to_BE(msg_hash).decode('hex')
-        pub = '04' + pubX + pubY
-        pub = pub.decode('hex')
+        pubX = utils.int_to_big_endian(pubX).encode('hex')
+        pubY = utils.int_to_big_endian(pubY).encode('hex')
+        msg_hash = utils.int_to_big_endian(msg_hash)
+        pub = ('04' + pubX + pubY).decode('hex')
         verified = ecdsa_raw_verify(msg_hash, (v, r, s), pub)
         print 'verified: ', verified
         stk.append(verified)
@@ -362,7 +355,7 @@ def apply_op(block, tx, msg, code, compustate):
         # parameters: msg_hash (32), v (32), r (32), s (32), p (64 - empty array to hold pubkey)
         # stack should have all args
         msg_hash, v, r, s = stackargs
-        msg_hash = int_to_BE(msg_hash).decode('hex')
+        msg_hash = utils.int_to_big_endian(msg_hash)
         pubX, pubY = ecdsa_raw_recover(msg_hash, (v, r, s))
         stk.append(pubX)
         stk.append(pubY)

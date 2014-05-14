@@ -39,7 +39,7 @@ window.eth = (function ethScope() {
 		var req = { "jsonrpc": "2.0", "method": m, "params": p, "id": m_reqId }
 		m_reqId++
 		var request = new XMLHttpRequest();	
-		request.open("POST", "http://localhost:8080", false);
+		request.open("POST", "http://127.0.0.1:30203", false);
 //		console.log("Sending " + JSON.stringify(req))
 		request.send(JSON.stringify(req));
 		return JSON.parse(request.responseText).result;
@@ -48,7 +48,7 @@ window.eth = (function ethScope() {
 		var req = { "jsonrpc": "2.0", "method": m, "params": p, "id": m_reqId }
 		m_reqId++
 		var request = new XMLHttpRequest();	
-		request.open("POST", "http://localhost:8080", true);
+		request.open("POST", "http://127.0.0.1:30203", true);
 		request.send(JSON.stringify(req));
 		request.onreadystatechange = function() {
 			if (request.readyState === 4)

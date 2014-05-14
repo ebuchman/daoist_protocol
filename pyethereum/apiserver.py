@@ -152,12 +152,7 @@ def known_peers():
 # ######## DC msg ############
 @app.post(base_url + '/dc/')
 def dc():
-    # request.json FIXME / post json encoded data? i.e. the representation of
-    # a tx
     indata = bottle.request.body.read()
-    print indata
-    data = json.loads(indata)
-    print data
-    logger.debug('PUT dc/ %s', data)
-    return data # TODO do sumthin
-    # return bottle.redirect(base_url + '/dc/') # TODO + dc.hex_hash())
+    data = json.loads(json.loads(indata))
+    signals.dao_command_received.send(sender=None, dao_command=data)
+    return data

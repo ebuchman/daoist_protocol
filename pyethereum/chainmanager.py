@@ -10,6 +10,7 @@ import rlp
 import blocks
 import processblock
 from transactions import Transaction
+from bitcoin import ecdsa_raw_recover, ecdsa_raw_verify
 
 logger = logging.getLogger(__name__)
 
@@ -94,8 +95,18 @@ class Miner():
 
         self.nonce = nonce
         return False
+'''
+    Notes about DCP Handling
+         manager should init the dcp_list by refering to a file or checking the route contract
+         each dcp should be an empty transaction addressed to the appropriate DAO
+         when a dc comes in, check if its dest is on the list.  if not, add (if you want to be risky) or ignore
+         add a dc to the dcp by:
+            check sig
+            parse msg args
+            add msg args to dcp tx
+            broadcast/save new tx to replace old one
 
-
+'''
 class ChainManager(StoppableLoopThread):
 
     """
@@ -107,7 +118,8 @@ class ChainManager(StoppableLoopThread):
         # initialized after configure
         self.miner = None
         self.blockchain = None
-        self.dcp_list = []
+        self.dcp_list = {}
+        self.route_risk = 1
 
     def configure(self, config):
         self.config = config
@@ -116,6 +128,10 @@ class ChainManager(StoppableLoopThread):
         logger.debug('Chain @ #%d %s', self.head.number, self.head.hex_hash())
         self.log_chain()
         self.new_miner()
+        self.init_dcp_list()
+
+    def init_dcp_list(self):
+        pass
 
     @property
     def head(self):
@@ -233,8 +249,51 @@ class ChainManager(StoppableLoopThread):
             self._update_head(block)
         return True
 
+    def init_dcp(self, addr):
+        nonce = self.miner.block.get_nonce(self.config.get('wallet', 'coinbase'))
+        GASPRICE = 10
+        new_dcp = Transaction(nonce, GASPRICE, 1, addr, 0, None)
+        self.dcp_list[addr] = new_dcp
+
+    def _add_dc_to_dcp(self, addr, sig, msghash, msgsize, data):
+        tohash = ''
+        for d in data:
+            tohash += utils.zpad(str(d), 32)
+        tohash = utils.zpad(str(msgsize), 32) + tohash
+        assert (msghash == utils.sha3(tohash))
+        X, Y = ecdsa_raw_recover(msghash, sig)
+        pX = utils.int_to_big_endian(X).encode('hex')
+        pY = utils.int_to_big_endian(Y).encode('hex')
+        pub = '04'+pX+pY
+        assert(ecdsa_raw_verify(msghash, sig, pub.decode('hex')))
+        
+        # replace dcp transaction
+    
+    def unpackage_dc(self, dc):
+        print dc
+        nonce = dc['nonce']
+        addr = dc['addr']
+        sig = int(dc['v'], 16), int(dc['r'], 16), int(dc['s'], 16)
+        msghash = str(dc['hash']).decode('hex')
+        msgsize = dc['msgsize']
+        data = dc['data']
+        return nonce, addr, sig, msghash, msgsize, data
+
     def add_dc_to_dcp(self, dc):
-        pass
+        nonce, addr, sig, msghash, msgsize, data = self.unpackage_dc(dc)
+        print data
+        if self.dcp_list.has_key(addr):
+            print 'addr exists! adding dc'
+            self._add_dc_to_dcp(addr, sig, msghash, msgsize, data)
+        elif self.route_risk:
+            print 'addr does not exist.  adding new dcp'
+            self.init_dcp(addr)
+            self._add_dc_to_dcp(addr, sig, msghash, msgsize, data)
+        else:
+            return
+
+        # verify new dcp
+        # broadcast
 
     def add_transaction(self, transaction):
         logger.debug("add transaction %r" % transaction)
