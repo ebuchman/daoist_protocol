@@ -361,11 +361,9 @@ def apply_op(block, tx, msg, code, compustate):
         stk.append(pubY)
     elif op == 'PUB2ADDR':
         pubX, pubY = stackargs
-        pubXhex = "%02x"%pubX
-        if len(pubXhex) % 2 != 0: pubXhex = "0" + pubXhex
-        pubYhex = "%02x"%pubY
-        if len(pubYhex)% 2 != 0: pubYhex = "0" + pubYhex
-        pub = pubXhex + pubYhex
+        pubX = utils.int_to_big_endian(pubX).encode('hex')
+        pubY = utils.int_to_big_endian(pubY).encode('hex')
+        pub = pubX + pubY
         pub = pub.decode('hex')
         addr = utils.sha3(pub)[12:]
         stk.append(addr)
