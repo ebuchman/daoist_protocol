@@ -10,6 +10,7 @@ function strRepeat(x, n) {
 }
 
 function pad(x, n){
+   
     return (strRepeat("\x00", 32) + x).slice(-n);
 }
 
@@ -24,14 +25,18 @@ function tiptag(){
         xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");
 
     var key = Ethereum.util.sha3('brain wallet'); 
-    var addr = "daoAddr"
     var msgsize = 2;
     var to_addr = document.getElementById("to").value;
     var value = parseInt(document.getElementById("value").value);
-    var tohash =pad(msgsize.toString(16), 32) + pad(to_addr, 32) + pad(value, 32);
-
+    console.log('to addr');
+    console.log(to_addr);
+    console.log(Ethereum.convert.hexToBytes(to_addr));
+    var tohash =pad(msgsize.toString(16), 32) + pad(Ethereum.convert.hexToBytes(to_addr), 32) + pad(value, 32);
+    console.log('to hash:');
+    console.log(tohash);
     var hash = Ethereum.util.sha3(tohash);
-    console.log('here we go!')
+    console.log('hash:');
+    console.log(hash);
     console.log(Ethereum.convert.hexToBytes(hash));
     var vrs = Ethereum.ecdsa.sign(Ethereum.convert.hexToBytes(hash), Ethereum.util.bigIntFromHex(key));
 
@@ -40,10 +45,10 @@ function tiptag(){
       'v': bigIntToHex(vrs[0]),
       'r': bigIntToHex(vrs[1]),
       's': bigIntToHex(vrs[2]),
-      'addr': addr,
+      'addr': to_addr,
       'hash': hash,
       'msgsize': msgsize,
-      'data': [to_addr, value]
+      'data': [Ethereum.convert.hexToBytes(to_addr), value]
       //'data': pad(document.getElementById("to").value, 32) + pad(document.getElementById("value").value, 32)
     });
     console.log(document.getElementById("to").value);

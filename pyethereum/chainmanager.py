@@ -11,11 +11,13 @@ import blocks
 import processblock
 from transactions import Transaction
 from bitcoin import ecdsa_raw_recover, ecdsa_raw_verify
+import serpent
 
 logger = logging.getLogger(__name__)
 
 rlp_hash_hex = lambda data: utils.sha3(rlp.encode(data)).encode('hex')
 
+privkey = utils.sha3('brain wallet')
 
 class Miner():
 
@@ -191,6 +193,14 @@ class ChainManager(StoppableLoopThread):
                 miner.add_transaction(tx)
         self.miner = miner
 
+    def remove_old_tx(self, addr):
+        miner = Miner(self.head, self.config.get('wallet', 'coinbase'))
+        for tx in self.miner.get_transactions():
+            if not tx.to == addr:
+                miner.add_transaction(tx)
+        self.miner = miner
+
+
     def mine(self):
         with self.lock:
             block = self.miner.mine()
@@ -252,20 +262,37 @@ class ChainManager(StoppableLoopThread):
     def init_dcp(self, addr):
         nonce = self.miner.block.get_nonce(self.config.get('wallet', 'coinbase'))
         GASPRICE = 10
-        new_dcp = Transaction(nonce, GASPRICE, 1, addr, 0, None)
+        print 'addr!'
+        print addr
+        new_dcp = Transaction(nonce, GASPRICE, 1, addr, 0, serpent.encode_datalist([0])).sign(privkey) #encode datalist...
         self.dcp_list[addr] = new_dcp
 
     def _add_dc_to_dcp(self, addr, sig, msghash, msgsize, data):
+        assert(self.verify_dc_sig(sig, msghash, msgsize, data))
+        data = self.dcp_list[addr].data
+        data[0] += 1
+        data.append(msgsize)
+        map(data.append, data)
+        self.dcp_list[addr].data = data
+        self.dcp_list[addr].sign(privkey)
+        
+    def verify_dc_sig(self, sig, msghash, msgsize, data):
         tohash = ''
         for d in data:
             tohash += utils.zpad(str(d), 32)
         tohash = utils.zpad(str(msgsize), 32) + tohash
+        print 'tohash!'
+        print tohash
+        print tohash.encode('hex')
+        print 'msg hash'
+        print msghash
+        print msghash.encode('hex')
         assert (msghash == utils.sha3(tohash))
         X, Y = ecdsa_raw_recover(msghash, sig)
         pX = utils.int_to_big_endian(X).encode('hex')
         pY = utils.int_to_big_endian(Y).encode('hex')
         pub = '04'+pX+pY
-        assert(ecdsa_raw_verify(msghash, sig, pub.decode('hex')))
+        return ecdsa_raw_verify(msghash, sig, pub.decode('hex'))
         
         # replace dcp transaction
     
@@ -279,7 +306,7 @@ class ChainManager(StoppableLoopThread):
         data = dc['data']
         return nonce, addr, sig, msghash, msgsize, data
 
-    def add_dc_to_dcp(self, dc):
+    def handle_new_dc(self, dc):
         nonce, addr, sig, msghash, msgsize, data = self.unpackage_dc(dc)
         print data
         if self.dcp_list.has_key(addr):
@@ -292,7 +319,9 @@ class ChainManager(StoppableLoopThread):
         else:
             return
 
-        # verify new dcp
+        remove_old_tx(addr)
+        success, ans = processblock.apply_tx(self.miner.block, self.dcp_list[addr])
+       
         # broadcast
 
     def add_transaction(self, transaction):
@@ -449,7 +478,7 @@ def gettransactions_received_handler(sender, peer, **kwargs):
 
 @receiver(signals.dao_command_received)
 def dao_command_received_handler(sender, dao_command, **kwargs):
-    chain_manager.add_dc_to_dcp(dao_command)
+    chain_manager.handle_new_dc(dao_command)
 
 @receiver(signals.remote_blocks_received)
 def remote_blocks_received_handler(sender, block_lst, peer, **kwargs):
