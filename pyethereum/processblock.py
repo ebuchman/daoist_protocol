@@ -44,6 +44,7 @@ def verify(block, parent):
     for i in range(block.transaction_count):
         tx, s, g = block.transactions.get(utils.encode_int(i))
         tx = transactions.Transaction.deserialize(tx)
+        print tx.startgas, block2.gas_used, block.gas_limit
         assert tx.startgas + block2.gas_used <= block.gas_limit
         apply_tx(block2, tx)
         assert s == block2.state.root
@@ -78,6 +79,7 @@ def apply_tx(block, tx):
         block.increment_nonce(tx.sender)
     snapshot = block.snapshot()
     message_gas = tx.startgas - GTXDATA * len(tx.serialize()) - GTXCOST
+    print 'msg gas', message_gas
     message = Message(tx.sender, tx.to, tx.value, message_gas, tx.data)
     if tx.to:
         result, gas, data = apply_msg(block, tx, message)

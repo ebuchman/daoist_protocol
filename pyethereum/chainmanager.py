@@ -176,7 +176,7 @@ class ChainManager(StoppableLoopThread):
 
     def _initialize_blockchain(self):
         logger.info('Initializing new chain @ %s', utils.get_db_path())
-        genesis = blocks.genesis()
+        genesis = blocks.genesis({self_addr: 10**18})
         self._store_block(genesis)
         self._update_head(genesis)
         self.blockchain.commit()
@@ -206,11 +206,14 @@ class ChainManager(StoppableLoopThread):
         self.miner = miner
 
     def remove_old_tx(self, addr):
+        print 'old nonce', self.miner.block.get_nonce(self_addr)
         miner = Miner(self.head, self.config.get('wallet', 'coinbase'))
         for tx in self.miner.get_transactions():
             if not tx.to == addr:
                 miner.add_transaction(tx)
         self.miner = miner
+        print 'new nonce', self.miner.block.get_nonce(self_addr)
+        self.miner.block.decrement_nonce(self_addr)
 
 
     def mine(self):
@@ -272,17 +275,19 @@ class ChainManager(StoppableLoopThread):
         return True
 
     def init_dcp(self, addr):
-        nonce = self.miner.block.get_nonce(self.config.get('wallet', 'coinbase'))
-        GASPRICE = 10
+        nonce = self.miner.block.get_nonce(self_addr) #self.config.get('wallet', 'coinbase'))
+        print 'init nonce for dcp', nonce
+        GASPRICE = 100
         print 'addr!'
         print addr
-        new_dcp = Transaction(nonce, GASPRICE, 1, addr, 0, serpent.encode_datalist([0])).sign(privkey) #encode datalist...
+        new_dcp = Transaction(nonce, GASPRICE, 10**5, addr, 0, serpent.encode_datalist([0])).sign(privkey) #encode datalist...
+        print 'sender', new_dcp.sender
+        print 'self addr', self_addr
         self.dcp_list[addr] = new_dcp
 
     def _add_dc_to_dcp(self, to_addr, from_addr, sig, msghash, msgsize, data):
         assert(self.verify_dc_sig(sig, msghash, msgsize, from_addr, data))
         tx = self.dcp_list[to_addr]
-        tx.nonce = self.miner.block.get_nonce(self_addr)
         txdata = serpent.decode_datalist(tx.data)
         txdata[0] += 1 #increment dc count
         #append dc data to dcp tx
@@ -329,6 +334,7 @@ class ChainManager(StoppableLoopThread):
             return
 
         self.remove_old_tx(to_addr)
+        self.dcp_list[to_addr].nonce = self.miner.block.get_nonce(self_addr) # add nonce here since we removed a transaction (maybeS)
         success, ans = processblock.apply_tx(self.miner.block, self.dcp_list[to_addr])
         print success, ans 
         # broadcast

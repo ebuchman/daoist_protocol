@@ -7,7 +7,7 @@ import processblock
 import transactions
 
 
-INITIAL_DIFFICULTY = 2 ** 22
+INITIAL_DIFFICULTY = 2 ** 12
 GENESIS_PREVHASH = "\x00" * 32
 GENESIS_COINBASE = "0" * 40
 GENESIS_NONCE = utils.sha3(chr(42))
@@ -291,6 +291,9 @@ class Block(object):
     def increment_nonce(self, address):
         return self._delta_item(address, 'nonce', 1)
 
+    def decrement_nonce(self, address):
+        return self._delta_item(address, 'nonce', -1)
+
     def get_balance(self, address):
         return self._get_acct_item(address, 'balance')
 
@@ -482,6 +485,7 @@ def has_block(blockhash):
 
 
 def genesis(initial_alloc=GENESIS_INITIAL_ALLOC):
+    print initial_alloc
     # https://ethereum.etherpad.mozilla.org/11
     block = Block(prevhash=GENESIS_PREVHASH, coinbase=GENESIS_COINBASE,
                 tx_list_root=GENESIS_TX_LIST_ROOT,
@@ -489,4 +493,6 @@ def genesis(initial_alloc=GENESIS_INITIAL_ALLOC):
                   gas_limit=GENESIS_GAS_LIMIT)
     for addr in initial_alloc:
         block.set_balance(addr, initial_alloc[addr])
+        print addr
+        print block.get_balance(addr)
     return block
