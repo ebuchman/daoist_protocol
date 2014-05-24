@@ -27,13 +27,16 @@ print verified
 tx_make_root = transactions.contract(0,10,10**30, 10**30, code).sign(key)
 success, root_contract = processblock.apply_tx(gen, tx_make_root)
 
-tx_init_root = transactions.Transaction(1, 100, 10**40, root_contract, 0, serpent.encode_datalist([msg_hash, v, r, s])).sign(key)
+#tx_init_root = transactions.Transaction(1, 100, 10**40, root_contract, 0, serpent.encode_datalist([msg_hash, v, r, s])).sign(key)
 #tx_init_root = transactions.Transaction(1, 100, 10**40, root_contract, 0, serpent.encode_datalist(['hi', 'bye'])).sign(key)
+tx_init_root = transactions.Transaction(1, 100, 10**40, root_contract, 0, serpent.encode_datalist([2, '139dcd5cc79e260272e05147c349ab5f2db3f102', 1])).sign(key)
+#tx_init_root = transactions.Transaction(1, 100, 10**40, root_contract, 0, serpent.encode_datalist([2, 1])).sign(key)
 print assembly
 success, ans = processblock.apply_tx(gen, tx_init_root)
 print ans
 data = serpent.decode_datalist(ans)
 print data
+print hex(data[0])
 quit()
 print ans.encode('hex')
 data = serpent.decode_datalist(ans)

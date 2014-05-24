@@ -1,6 +1,7 @@
 import logging
 import time
 import struct
+import string
 from dispatch import receiver
 from stoppable import StoppableLoopThread
 import signals
@@ -12,12 +13,23 @@ import processblock
 from transactions import Transaction
 from bitcoin import ecdsa_raw_recover, ecdsa_raw_verify
 import serpent
+import sys
 
 logger = logging.getLogger(__name__)
 
 rlp_hash_hex = lambda data: utils.sha3(rlp.encode(data)).encode('hex')
 
 privkey = utils.sha3('brain wallet')
+self_addr = utils.privtoaddr(privkey)
+
+def byte_arrays_to_string(arr):
+    stri = ''
+    for d in arr:
+        stri += string.join(map(chr, d), '')
+    return stri
+
+def byte_array_to_string(arr):
+    return string.join(map(chr, arr), '')
 
 class Miner():
 
@@ -120,7 +132,7 @@ class ChainManager(StoppableLoopThread):
         # initialized after configure
         self.miner = None
         self.blockchain = None
-        self.dcp_list = {}
+        self.dcp_list = {} # addr:tx
         self.route_risk = 1
 
     def configure(self, config):
@@ -267,26 +279,22 @@ class ChainManager(StoppableLoopThread):
         new_dcp = Transaction(nonce, GASPRICE, 1, addr, 0, serpent.encode_datalist([0])).sign(privkey) #encode datalist...
         self.dcp_list[addr] = new_dcp
 
-    def _add_dc_to_dcp(self, addr, sig, msghash, msgsize, data):
-        assert(self.verify_dc_sig(sig, msghash, msgsize, data))
-        data = self.dcp_list[addr].data
-        data[0] += 1
-        data.append(msgsize)
-        map(data.append, data)
-        self.dcp_list[addr].data = data
-        self.dcp_list[addr].sign(privkey)
-        
-    def verify_dc_sig(self, sig, msghash, msgsize, data):
-        tohash = ''
-        for d in data:
-            tohash += utils.zpad(str(d), 32)
-        tohash = utils.zpad(str(msgsize), 32) + tohash
-        print 'tohash!'
-        print tohash
-        print tohash.encode('hex')
-        print 'msg hash'
-        print msghash
-        print msghash.encode('hex')
+    def _add_dc_to_dcp(self, to_addr, from_addr, sig, msghash, msgsize, data):
+        assert(self.verify_dc_sig(sig, msghash, msgsize, from_addr, data))
+        tx = self.dcp_list[to_addr]
+        tx.nonce = self.miner.block.get_nonce(self_addr)
+        txdata = serpent.decode_datalist(tx.data)
+        txdata[0] += 1 #increment dc count
+        #append dc data to dcp tx
+        strings = byte_arrays_to_string(data) # data contains from_addr, msg_size, [args]
+        map(txdata.append, strings)
+        self.dcp_list[to_addr].data = serpent.encode_datalist(txdata)
+        self.dcp_list[to_addr].sign(privkey)
+
+
+    def verify_dc_sig(self, sig, msghash, msgsize, from_addr, data):
+        # data comes in as array of byte array (bytes as ints, from js)
+        tohash = byte_arrays_to_string(data)
         assert (msghash == utils.sha3(tohash))
         X, Y = ecdsa_raw_recover(msghash, sig)
         pX = utils.int_to_big_endian(X).encode('hex')
@@ -299,29 +307,30 @@ class ChainManager(StoppableLoopThread):
     def unpackage_dc(self, dc):
         print dc
         nonce = dc['nonce']
-        addr = dc['addr']
+        to_addr = dc['to_addr']
+        from_addr = dc['from_addr']
         sig = int(dc['v'], 16), int(dc['r'], 16), int(dc['s'], 16)
         msghash = str(dc['hash']).decode('hex')
         msgsize = dc['msgsize']
         data = dc['data']
-        return nonce, addr, sig, msghash, msgsize, data
+        return nonce, to_addr, from_addr, sig, msghash, msgsize, data
 
     def handle_new_dc(self, dc):
-        nonce, addr, sig, msghash, msgsize, data = self.unpackage_dc(dc)
+        nonce, to_addr, from_addr, sig, msghash, msgsize, data = self.unpackage_dc(dc)
         print data
-        if self.dcp_list.has_key(addr):
+        if self.dcp_list.has_key(to_addr):
             print 'addr exists! adding dc'
-            self._add_dc_to_dcp(addr, sig, msghash, msgsize, data)
+            self._add_dc_to_dcp(to_addr, from_addr, sig, msghash, msgsize, data)
         elif self.route_risk:
             print 'addr does not exist.  adding new dcp'
-            self.init_dcp(addr)
-            self._add_dc_to_dcp(addr, sig, msghash, msgsize, data)
+            self.init_dcp(to_addr)
+            self._add_dc_to_dcp(to_addr, from_addr, sig, msghash, msgsize, data)
         else:
             return
 
-        remove_old_tx(addr)
-        success, ans = processblock.apply_tx(self.miner.block, self.dcp_list[addr])
-       
+        self.remove_old_tx(to_addr)
+        success, ans = processblock.apply_tx(self.miner.block, self.dcp_list[to_addr])
+        print success, ans 
         # broadcast
 
     def add_transaction(self, transaction):

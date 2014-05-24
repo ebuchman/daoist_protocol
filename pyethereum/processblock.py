@@ -339,6 +339,9 @@ def apply_op(block, tx, msg, code, compustate):
         if len(mem) < ceil32(stackargs[0] + stackargs[1]):
             mem.extend([0] * (ceil32(stackargs[0] + stackargs[1]) - len(mem)))
         data = ''.join(map(chr, mem[stackargs[0]:stackargs[0] + stackargs[1]]))
+        print 'data time!'
+        print data
+        print data.encode('hex')
         stk.append(int(utils.sha3(data).encode('hex'), 16))
     elif op == 'ECVERIFY':
         # parameters: msg_hash (32), v (32), r (32), s (32), pubX (32), pubY (32)

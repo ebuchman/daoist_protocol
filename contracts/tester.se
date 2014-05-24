@@ -1,7 +1,16 @@
-a = array(2)
-a[0] = 'hi'
-a[1] = 'bye'
-return(a, 2)
+b = array(2)
+b[0] = msg.data[0]
+b[1] = msg.data[1]
+b[2] = msg.data[2]
+c = sha3(b, 3)
+return(c)
+
+//a = array(2)
+//a[0] = 'hi'
+//a[1] = 'bye'
+//return(a, 2)
+
+
 //msghash = msg.data[0]
 //v = msg.data[1]
 //r = msg.data[2]

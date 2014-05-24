@@ -1,3 +1,6 @@
+
+var daoAddr = "0x995db8d9f8f4dcc2b35da87a3768bd10eb8ee2da";
+
 function strRepeat(x, n) {
     var s = '';
     for (;;) {
@@ -9,35 +12,63 @@ function strRepeat(x, n) {
     return s;
 }
 
-function pad(x, n){
-   
-    return (strRepeat("\x00", 32) + x).slice(-n);
+function pad(x, n) {
+    var ret =  (strRepeat("\x00", 32) + x).slice(-n);
+    return ret;
 }
 
-function bigIntToHex(bi){
+function pad_array(x, n){
+    var l = n-x.length;
+    var padded = new Array(l);
+    for (var i=0; i < l; i++)
+        padded[i] = 0;
+    return padded.concat(x)
+}
+
+function bigIntToHex(bi) {
     return Ethereum.util.encodeHex(Ethereum.util.intToBigEndian(bi));
 }
 
-function tiptag(){
+function tiptag() {
+
     if (window.XMLHttpRequest)
         xmlhttp=new XMLHttpRequest();
     else
         xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");
 
     var key = Ethereum.util.sha3('brain wallet'); 
+    var from_addr = Ethereum.util.privToAddr(key);
+    var addr = daoAddr;
     var msgsize = 2;
     var to_addr = document.getElementById("to").value;
     var value = parseInt(document.getElementById("value").value);
+
     console.log('to addr');
     console.log(to_addr);
-    console.log(Ethereum.convert.hexToBytes(to_addr));
-    var tohash =pad(msgsize.toString(16), 32) + pad(Ethereum.convert.hexToBytes(to_addr), 32) + pad(value, 32);
+
+    var size_pad = Ethereum.convert.numToBytes(msgsize, 32)
+    var val_pad = Ethereum.convert.numToBytes(value, 32)
+    var addr_pad = Ethereum.convert.hexToBytes(to_addr);
+    addr_pad = pad_array(addr_pad, 32)
+
+    /* to hash structure:
+        1st arg is from_addr
+        2nd arg is num_args
+        args...
+
+        everything should be in bytes and padded to 32
+    */
+    console.log('from addres '+from_addr);
+    console.log(Ethereum.convert.hexToBytes(from_addr));
+    var tohash = addr_pad.concat(size_pad).concat(val_pad)
     console.log('to hash:');
     console.log(tohash);
+
     var hash = Ethereum.util.sha3(tohash);
     console.log('hash:');
     console.log(hash);
     console.log(Ethereum.convert.hexToBytes(hash));
+
     var vrs = Ethereum.ecdsa.sign(Ethereum.convert.hexToBytes(hash), Ethereum.util.bigIntFromHex(key));
 
     data = JSON.stringify({
@@ -45,28 +76,49 @@ function tiptag(){
       'v': bigIntToHex(vrs[0]),
       'r': bigIntToHex(vrs[1]),
       's': bigIntToHex(vrs[2]),
-      'addr': to_addr,
+      'from_addr': from_addr,
+      'to_addr': to_addr,
       'hash': hash,
       'msgsize': msgsize,
-      'data': [Ethereum.convert.hexToBytes(to_addr), value]
+      'data': [addr_pad, size_pad, val_pad]
       //'data': pad(document.getElementById("to").value, 32) + pad(document.getElementById("value").value, 32)
     });
-    console.log(document.getElementById("to").value);
+    console.log(document.getElementById("value").value);
     console.log(data);
-    xmlhttp.onreadystatechange=function(){
-        if (xmlhttp.readyState==4 && xmlhttp.status==200){
-	    console.log(xmlhttp.responseText);
-	    var response = JSON.parse(xmlhttp.responseText);
-
+    xmlhttp.onreadystatechange = function() {
+      document.getElementById("daocoin").innerText = xmlhttp.statusText;
+      if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+        var response = JSON.parse(xmlhttp.responseText);
+        if (vrs[0] == 0) {
+          document.getElementById("daocoin").innerHTML = "Error signing request.";
         }
+        else {
+          document.getElementById("daocoin").innerHTML = "TAG! (" + xmlhttp.statusText + ")";
+        }
+      }
+      else if (xmlhttp.readyState == 4)
+        document.getElementById("daocoin").innerHTML = "Error! " + xmlhttp.status + ": " + xmlhttp.statusText;
     }
     var query_string = JSON.stringify(data);
     xmlhttp.open("POST", "http://127.0.0.1:30203/api/v0alpha/dc/", true);
-    xmlhttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+    xmlhttp.setRequestHeader("Content-type", "application/json");
     xmlhttp.setRequestHeader("Content-length", query_string.length); 
     xmlhttp.send(query_string);
     return false;
 }
+
+updateBalances = function() {
+  // getSomething();
+  console.log(eth.balanceAt(eth.coinbase).dec());
+  $("#eth").text(eth.balanceAt(eth.coinbase).dec());
+  $("#daocoin").text(eth.storageAt(daoAddr, eth.coinbase).dec());
+  $("#tot").text(eth.balanceAt(daoAddr).dec());
+};
+
+// $(document).ready(function() {
+//   eth.watch(daoAddr, eth.coinbase, updateBalances);
+//   updateBalances();
+// });
 
 /*
 function tip_tag(){
@@ -124,13 +176,5 @@ function tip_tag(){
     //   eth.gasPrice
     // );
   };
-  updateBalances = function() {
-    // getSomething();
-    document.getElementById("eth").innerText = eth.balanceAt(eth.coinbase).dec();
-    document.getElementById("daocoin").innerText = eth.storageAt(daoAddr, eth.coinbase).dec();
-    document.getElementById("tot").innerText = eth.balanceAt(daoAddr).dec();
-  };
-  // eth.watch(daoAddr, eth.coinbase, updateBalances);
-  updateBalances();
 }
 */
